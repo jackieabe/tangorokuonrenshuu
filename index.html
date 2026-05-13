@@ -4,95 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日本語単語練習ツール（発音判定＆セッション録音付）</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
-        body { font-family: 'Noto Sans JP', sans-serif; }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.3; }
-            100% { opacity: 1; }
-        }
-        .animate-pulse-slow {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        
-        .listening {
-            animation: pulse 1s infinite;
-            background-color: #f43f5e !important;
-        }
-    </style>
-</head>
-<body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-4">
-
-    <div id="app" class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200 relative">
-        
-        <div id="recording-status" class="hidden absolute top-4 right-4 flex items-center gap-2 bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold border border-red-100 z-20">
-            <span class="w-2 h-2 bg-red-600 rounded-full animate-pulse-slow"></span>
-            録音中
-        </div>
-
-        <div class="bg-indigo-600 p-6 text-white text-center">
-            <h1 id="round-title" class="text-xl font-bold">単語練習</h1>
-            <p id="round-desc" class="text-indigo-100 text-sm mt-1">発音判定 ＋ セッション録音</p>
-        </div>
-
-        <div class="w-full bg-slate-100 h-2">
-            <div id="progress" class="bg-indigo-400 h-2 transition-all duration-300" style="width: 0%"></div>
-        </div>
-
-        <div class="p-8 flex flex-col items-center justify-center min-h-[420px] text-center">
-            
-            <div id="card-display" class="space-y-4 w-full"></div>
-
-            <div id="pronunciation-area" class="w-full mt-6 hidden flex-col items-center">
-                <div id="feedback-text" class="h-10 text-lg font-bold mb-2 flex items-center justify-center w-full"></div>
-                <button id="speech-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-full transition-all shadow-md flex items-center justify-center gap-2">
-                    <span class="text-xl">🎤</span> 発音をチェック
-                </button>
-            </div>
-            
-            <div id="start-record-container" class="mt-8 w-full hidden">
-                <button id="start-rec-btn" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 005.93 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd" />
-                    </svg>
-                    練習を開始する
-                </button>
-                <p class="text-[10px] text-slate-400 mt-2">※ブラウザのマイク許可が必要です</p>
-            </div>
-        </div>
-
-        <div class="p-6 border-t border-slate-100 flex gap-4">
-            <button id="next-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition-colors shadow-lg active:scale-95">
-                次へ
-            </button>
-        </div>
-
-        <div id="finish-screen" class="hidden absolute inset-0 bg-white z-30 flex flex-col items-center justify-center p-8 text-center">
-            <div class="text-6xl mb-6">🎓</div>
-            <h2 class="text-2xl font-bold text-slate-800 mb-2">練習完了！</h2>
-            <p class="text-slate-500 mb-2 text-lg">最後までやり遂げましたね。</p>
-            
-            <div id="score-display" class="text-3xl font-bold text-indigo-600 mb-8"></div>
-            
-            <div class="space-y-3 w-full">
-                <button id="download-btn" class="w-full bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg flex items-center justify-center gap-2 hidden">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    録音ファイルを保存する
-                </button>
-                
-                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-600 px-6 py-4 rounded-2xl font-bold hover:bg-slate-200 transition-colors">
-                    最初からやり直す
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script>
+   <script>
         const wordData = [
             { h: "えいご", k: "英語", r: "Eigo", zh: "英文", accepted: ["英語", "えいご", "エイゴ", "えーご", "A語"] },
             { h: "すうがく", k: "数学", r: "Suugaku", zh: "數學", accepted: ["数学", "すうがく", "スウガク", "通学"] },
@@ -218,14 +130,14 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // 【変更点】ブラウザが対応している正しい形式を自動判別する
+                // 【修正ポイント】WebM（Chrome用）を先にチェックする順番に変更しました！
                 if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
-                    if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                        mimeType = 'audio/mp4';
-                        fileExtension = 'mp4';
-                    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    if (MediaRecorder.isTypeSupported('audio/webm')) {
                         mimeType = 'audio/webm';
                         fileExtension = 'webm';
+                    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                        mimeType = 'audio/mp4';
+                        fileExtension = 'mp4';
                     }
                 }
 
