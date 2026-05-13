@@ -18,10 +18,9 @@
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
         
-        /* 判定ボタンのアニメーション */
         .listening {
             animation: pulse 1s infinite;
-            background-color: #f43f5e !important; /* rose-500 */
+            background-color: #f43f5e !important;
         }
     </style>
 </head>
@@ -29,41 +28,31 @@
 
     <div id="app" class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200 relative">
         
-        <!-- Recording Status Bar -->
         <div id="recording-status" class="hidden absolute top-4 right-4 flex items-center gap-2 bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold border border-red-100 z-20">
             <span class="w-2 h-2 bg-red-600 rounded-full animate-pulse-slow"></span>
             録音中
         </div>
 
-        <!-- Header -->
         <div class="bg-indigo-600 p-6 text-white text-center">
             <h1 id="round-title" class="text-xl font-bold">単語練習</h1>
             <p id="round-desc" class="text-indigo-100 text-sm mt-1">発音判定 ＋ セッション録音</p>
         </div>
 
-        <!-- Progress Bar -->
         <div class="w-full bg-slate-100 h-2">
             <div id="progress" class="bg-indigo-400 h-2 transition-all duration-300" style="width: 0%"></div>
         </div>
 
-        <!-- Card Content Area -->
         <div class="p-8 flex flex-col items-center justify-center min-h-[420px] text-center">
             
-            <div id="card-display" class="space-y-4 w-full">
-                <!-- Content injected by JS -->
-            </div>
+            <div id="card-display" class="space-y-4 w-full"></div>
 
-            <!-- 発音判定エリア (録音開始後に表示) -->
             <div id="pronunciation-area" class="w-full mt-6 hidden flex-col items-center">
-                <!-- 結果表示テキスト -->
                 <div id="feedback-text" class="h-10 text-lg font-bold mb-2 flex items-center justify-center w-full"></div>
-                <!-- 判定ボタン -->
                 <button id="speech-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-full transition-all shadow-md flex items-center justify-center gap-2">
                     <span class="text-xl">🎤</span> 発音をチェック
                 </button>
             </div>
             
-            <!-- Start Recording Overlay (最初の画面) -->
             <div id="start-record-container" class="mt-8 w-full hidden">
                 <button id="start-rec-btn" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -75,20 +64,17 @@
             </div>
         </div>
 
-        <!-- Controls -->
         <div class="p-6 border-t border-slate-100 flex gap-4">
             <button id="next-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition-colors shadow-lg active:scale-95">
                 次へ
             </button>
         </div>
 
-        <!-- Result Screen -->
         <div id="finish-screen" class="hidden absolute inset-0 bg-white z-30 flex flex-col items-center justify-center p-8 text-center">
             <div class="text-6xl mb-6">🎓</div>
             <h2 class="text-2xl font-bold text-slate-800 mb-2">練習完了！</h2>
             <p class="text-slate-500 mb-2 text-lg">最後までやり遂げましたね。</p>
             
-            <!-- スコア表示エリアを追加 -->
             <div id="score-display" class="text-3xl font-bold text-indigo-600 mb-8"></div>
             
             <div class="space-y-3 w-full">
@@ -148,6 +134,10 @@
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
+
+        // 保存するファイル形式と拡張子を自動で決める変数
+        let mimeType = 'audio/webm';
+        let fileExtension = 'webm';
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
@@ -227,24 +217,35 @@
         async function initRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                
+                // 【変更点】ブラウザが対応している正しい形式を自動判別する
+                if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
+                    if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                        mimeType = 'audio/mp4';
+                        fileExtension = 'mp4';
+                    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                        mimeType = 'audio/webm';
+                        fileExtension = 'webm';
+                    }
+                }
+
+                // 判別した形式で録音を開始する
+                mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
                 
                 mediaRecorder.ondataavailable = (event) => {
                     audioChunks.push(event.data);
                 };
 
                 mediaRecorder.onstop = () => {
-                    // ==========================================
-                    // 👇 変更点: typeを audio/mp4 にしました
-                    // ==========================================
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' });
+                    // 正しい形式の塊（Blob）を作成
+                    const audioBlob = new Blob(audioChunks, { type: mimeType });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     
                     downloadBtn.onclick = () => {
                         const link = document.createElement('a');
                         link.href = audioUrl;
-                        // 👇 変更点: 拡張子を .mp4 にしました
-                        link.download = `vocabulary_session_${new Date().getTime()}.mp4`;
+                        // 正しい拡張子で保存
+                        link.download = `vocabulary_session_${new Date().getTime()}.${fileExtension}`;
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
