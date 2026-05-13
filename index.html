@@ -4,7 +4,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日本語単語練習ツール（発音判定＆セッション録音付）</title>
-   <script>
+    <!-- Tailwind CSSの読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex items-center justify-center p-4">
+
+    <!-- メインコンテナ -->
+    <div class="max-w-md w-full bg-white rounded-xl shadow-lg overflow-hidden">
+        
+        <!-- ヘッダー＆プログレスバー -->
+        <div class="bg-indigo-50 p-6 border-b border-indigo-100">
+            <h1 id="round-title" class="text-xl font-bold text-indigo-800">1回目の練習</h1>
+            <p id="round-desc" class="text-sm text-indigo-600 mt-1">順番通り（すべて表示）</p>
+            <div class="mt-4 h-2 bg-indigo-200 rounded-full overflow-hidden">
+                <div id="progress" class="h-full bg-indigo-500 transition-all duration-300" style="width: 0%;"></div>
+            </div>
+            <!-- 録音ステータス -->
+            <div id="recording-status" class="hidden mt-3 text-xs font-bold text-rose-500 flex items-center">
+                <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse mr-2"></span>
+                録音中...
+            </div>
+        </div>
+
+        <!-- カード表示エリア -->
+        <div class="p-8 text-center min-h-[250px] flex flex-col justify-center items-center">
+            <div id="card-display" class="w-full">
+                <!-- ここにJavaScriptで単語が挿入されます -->
+            </div>
+
+            <!-- フィードバック表示（正解・不正解など） -->
+            <div id="feedback-text" class="mt-6 text-lg font-bold min-h-[1.5rem]"></div>
+        </div>
+
+        <!-- コントロールエリア -->
+        <div class="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-4">
+            
+            <!-- 録音開始（初回のみ表示） -->
+            <div id="start-record-container" class="flex justify-center">
+                <button id="start-rec-btn" class="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-lg shadow transition-colors">
+                    🎤 マイクを許可して練習開始
+                </button>
+            </div>
+
+            <!-- 発音チェックエリア -->
+            <div id="pronunciation-area" class="hidden flex-col gap-3">
+                <button id="speech-btn" class="w-full py-3 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <span class="text-xl">🎤</span> 発音をチェック
+                </button>
+                <button id="next-btn" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg transition-colors">
+                    次へ
+                </button>
+            </div>
+        </div>
+
+        <!-- 完了画面（すべて終わった後に表示） -->
+        <div id="finish-screen" class="hidden absolute inset-0 bg-white flex flex-col items-center justify-center p-6 text-center z-10">
+            <div class="text-6xl mb-4">🎉</div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">お疲れ様でした！</h2>
+            <p id="score-display" class="text-lg text-slate-600 mb-8">正解数: 0 / 0</p>
+            <button id="download-btn" class="hidden px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg shadow transition-colors">
+                💾 録音データをダウンロード
+            </button>
+        </div>
+
+    </div>
+
+    <!-- JavaScriptはHTMLが読み込まれた後（最後）に配置 -->
+    <script>
         const wordData = [
             { h: "えいご", k: "英語", r: "Eigo", zh: "英文", accepted: ["英語", "えいご", "エイゴ", "えーご", "A語"] },
             { h: "すうがく", k: "数学", r: "Suugaku", zh: "數學", accepted: ["数学", "すうがく", "スウガク", "通学"] },
@@ -47,7 +113,6 @@
         let audioChunks = [];
         let isRecording = false;
 
-        // 保存するファイル形式と拡張子を自動で決める変数
         let mimeType = 'audio/webm';
         let fileExtension = 'webm';
 
@@ -63,8 +128,8 @@
 
             recognition.onstart = () => {
                 isRecognizing = true;
-                speechBtn.classList.add('listening');
-                speechBtn.innerHTML = '<span class="text-xl">👂</span> 聞き取り中...';
+                speechBtn.classList.add('bg-indigo-300'); // 視覚的フィードバック追加
+                speechBtn.innerHTML = '<span class="text-xl animate-pulse">👂</span> 聞き取り中...';
                 feedbackText.innerText = '';
             };
 
@@ -73,10 +138,7 @@
                 transcript = transcript.replace(/[。、\s]/g, ''); 
 
                 const currentWord = currentList[currentIndex];
-
-                const isCorrect = currentWord.accepted.some(word => 
-                    transcript.includes(word)
-                );
+                const isCorrect = currentWord.accepted.some(word => transcript.includes(word));
 
                 if (isCorrect) {
                     feedbackText.innerHTML = `<span class="text-emerald-600">⭕️ 正解！ (${transcript})</span>`;
@@ -91,7 +153,6 @@
                     autoAdvanceTimeout = setTimeout(() => {
                         goToNextCard();
                     }, 1200);
-
                 } else {
                     feedbackText.innerHTML = `<span class="text-rose-500">❌ もう少し！ (${transcript})</span>`;
                 }
@@ -105,11 +166,11 @@
 
             recognition.onend = () => {
                 isRecognizing = false;
-                speechBtn.classList.remove('listening');
+                speechBtn.classList.remove('bg-indigo-300');
                 speechBtn.innerHTML = '<span class="text-xl">🎤</span> もう一度チェック';
             };
         } else {
-            alert("お使いのブラウザは音声認識に対応していません。Chromeをご利用ください。");
+            alert("お使いのブラウザは音声認識に対応していません。ChromeまたはEdgeをご利用ください。");
         }
 
         function autoStartSpeechRecognition() {
@@ -130,7 +191,6 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // 【修正ポイント】WebM（Chrome用）を先にチェックする順番に変更しました！
                 if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
                     if (MediaRecorder.isTypeSupported('audio/webm')) {
                         mimeType = 'audio/webm';
@@ -141,7 +201,6 @@
                     }
                 }
 
-                // 判別した形式で録音を開始する
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
                 
                 mediaRecorder.ondataavailable = (event) => {
@@ -149,14 +208,12 @@
                 };
 
                 mediaRecorder.onstop = () => {
-                    // 正しい形式の塊（Blob）を作成
                     const audioBlob = new Blob(audioChunks, { type: mimeType });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     
                     downloadBtn.onclick = () => {
                         const link = document.createElement('a');
                         link.href = audioUrl;
-                        // 正しい拡張子で保存
                         link.download = `vocabulary_session_${new Date().getTime()}.${fileExtension}`;
                         document.body.appendChild(link);
                         link.click();
@@ -200,6 +257,7 @@
             if (currentRound === 1 && currentIndex === 0 && !isRecording) {
                 startRecContainer.classList.remove('hidden');
                 pronunciationArea.classList.add('hidden');
+                pronunciationArea.classList.remove('flex');
             } else {
                 startRecContainer.classList.add('hidden');
             }
@@ -229,7 +287,7 @@
             }
 
             const totalSteps = currentList.length;
-            const progressVal = (currentIndex / totalSteps) * 100;
+            const progressVal = ((currentIndex + 1) / totalSteps) * 100; // +1して正確な進捗に修正
             progress.style.width = `${progressVal}%`;
 
             if (currentIndex === currentList.length - 1) {
