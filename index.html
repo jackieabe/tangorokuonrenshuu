@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日本語単語練習ツール（発音判定＆セッション録音付）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        body { font-family: 'Noto Sans JP', sans-serif; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+        .animate-pulse-slow {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        /* 判定ボタンのアニメーション */
+        .listening {
+            animation: pulse 1s infinite;
+            background-color: #f43f5e !important; /* rose-500 */
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200 relative">
+        
+        <!-- Recording Status Bar -->
+        <div id="recording-status" class="hidden absolute top-4 right-4 flex items-center gap-2 bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold border border-red-100 z-20">
+            <span class="w-2 h-2 bg-red-600 rounded-full animate-pulse-slow"></span>
+            録音中
+        </div>
+
+        <!-- Header -->
+        <div class="bg-indigo-600 p-6 text-white text-center">
+            <h1 id="round-title" class="text-xl font-bold">単語練習</h1>
+            <p id="round-desc" class="text-indigo-100 text-sm mt-1">発音判定 ＋ セッション録音</p>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="w-full bg-slate-100 h-2">
+            <div id="progress" class="bg-indigo-400 h-2 transition-all duration-300" style="width: 0%"></div>
+        </div>
+
+        <!-- Card Content Area -->
+        <div class="p-8 flex flex-col items-center justify-center min-h-[420px] text-center">
+            
+            <div id="card-display" class="space-y-4 w-full">
+                <!-- Content injected by JS -->
+            </div>
+
+            <!-- 発音判定エリア (録音開始後に表示) -->
+            <div id="pronunciation-area" class="w-full mt-6 hidden flex-col items-center">
+                <!-- 結果表示テキスト -->
+                <div id="feedback-text" class="h-10 text-lg font-bold mb-2 flex items-center justify-center w-full"></div>
+                <!-- 判定ボタン -->
+                <button id="speech-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-full transition-all shadow-md flex items-center justify-center gap-2">
+                    <span class="text-xl">🎤</span> 発音をチェック
+                </button>
+            </div>
+            
+            <!-- Start Recording Overlay (最初の画面) -->
+            <div id="start-record-container" class="mt-8 w-full hidden">
+                <button id="start-rec-btn" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 005.93 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd" />
+                    </svg>
+                    練習を開始する
+                </button>
+                <p class="text-[10px] text-slate-400 mt-2">※ブラウザのマイク許可が必要です</p>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="p-6 border-t border-slate-100 flex gap-4">
+            <button id="next-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition-colors shadow-lg active:scale-95">
+                次へ
+            </button>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="finish-screen" class="hidden absolute inset-0 bg-white z-30 flex flex-col items-center justify-center p-8 text-center">
+            <div class="text-6xl mb-6">🎓</div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">練習完了！</h2>
+            <p class="text-slate-500 mb-2 text-lg">最後までやり遂げましたね。</p>
+            
+            <!-- スコア表示エリアを追加 -->
+            <div id="score-display" class="text-3xl font-bold text-indigo-600 mb-8"></div>
+            
+            <div class="space-y-3 w-full">
+                <button id="download-btn" class="w-full bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg flex items-center justify-center gap-2 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    録音ファイルを保存する
+                </button>
+                
+                <button onclick="location.reload()" class="w-full bg-slate-100 text-slate-600 px-6 py-4 rounded-2xl font-bold hover:bg-slate-200 transition-colors">
+                    最初からやり直す
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const wordData = [
+            { h: "えいご", k: "英語", r: "Eigo", zh: "英文", accepted: ["英語", "えいご", "エイゴ", "えーご", "A語"] },
+            { h: "すうがく", k: "数学", r: "Suugaku", zh: "數學", accepted: ["数学", "すうがく", "スウガク", "通学"] },
+            { h: "ちゅうごくご", k: "中国語", r: "Chuugokugo", zh: "中文", accepted: ["中国語", "ちゅうごくご", "チュウゴクゴ", "中国"] },
+            { h: "にほんご", k: "日本語", r: "Nihongo", zh: "日文", accepted: ["日本語", "にほんご", "ニホンゴ", "日本"] },
+            { h: "しゃかい", k: "社会", r: "Shakai", zh: "社會", accepted: ["社会", "しゃかい", "シャカイ", "司会"] },
+            { h: "りか", k: "理科", r: "Rika", zh: "理化", accepted: ["理科", "りか", "リカ", "利己", "りこ", "リコ", "理化", "以下"] },
+            { h: "なに", k: "何", r: "Nani", zh: "什麼", accepted: ["何", "なに", "ナニ", "蟹", "かに"] },
+            { h: "せんせい", k: "先生", r: "Sensei", zh: "老師", accepted: ["先生", "せんせい", "センセイ", "先制"] },
+            { h: "にほん", k: "日本", r: "Nihon", zh: "日本", accepted: ["日本", "にほん", "ニホン", "二本"] },
+            { h: "しゅっしん", k: "出身", r: "Shusshin", zh: "出身/來自", accepted: ["出身", "しゅっしん", "シュッシン", "主神", "就寝", "送信"] },
+            { h: "あれ", k: "あれ", r: "Are", zh: "那個(遠處)", accepted: ["あれ", "アレ", "荒れ"] },
+            { h: "だれ", k: "だれ", r: "Dare", zh: "誰", accepted: ["誰", "だれ", "ダレ", "誰か"] }
+        ];
+
+        let currentRound = 1;
+        let currentIndex = 0;
+        let currentList = [...wordData];
+        
+        let totalCorrect = 0;
+        let isCurrentCardCorrect = false;
+        let autoAdvanceTimeout = null;
+        
+        const roundTitle = document.getElementById('round-title');
+        const roundDesc = document.getElementById('round-desc');
+        const cardDisplay = document.getElementById('card-display');
+        const nextBtn = document.getElementById('next-btn');
+        const progress = document.getElementById('progress');
+        const finishScreen = document.getElementById('finish-screen');
+        const recordingStatus = document.getElementById('recording-status');
+        const startRecContainer = document.getElementById('start-record-container');
+        const startRecBtn = document.getElementById('start-rec-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        
+        const pronunciationArea = document.getElementById('pronunciation-area');
+        const speechBtn = document.getElementById('speech-btn');
+        const feedbackText = document.getElementById('feedback-text');
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let isRecognizing = false;
+        
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                isRecognizing = true;
+                speechBtn.classList.add('listening');
+                speechBtn.innerHTML = '<span class="text-xl">👂</span> 聞き取り中...';
+                feedbackText.innerText = '';
+            };
+
+            recognition.onresult = (event) => {
+                let transcript = event.results[0][0].transcript;
+                transcript = transcript.replace(/[。、\s]/g, ''); 
+
+                const currentWord = currentList[currentIndex];
+
+                const isCorrect = currentWord.accepted.some(word => 
+                    transcript.includes(word)
+                );
+
+                if (isCorrect) {
+                    feedbackText.innerHTML = `<span class="text-emerald-600">⭕️ 正解！ (${transcript})</span>`;
+                    if (!isCurrentCardCorrect) {
+                        totalCorrect++;
+                        isCurrentCardCorrect = true;
+                    }
+                    
+                    if (isRecognizing) recognition.abort();
+                    if (autoAdvanceTimeout) clearTimeout(autoAdvanceTimeout);
+                    
+                    autoAdvanceTimeout = setTimeout(() => {
+                        goToNextCard();
+                    }, 1200);
+
+                } else {
+                    feedbackText.innerHTML = `<span class="text-rose-500">❌ もう少し！ (${transcript})</span>`;
+                }
+            };
+
+            recognition.onerror = (event) => {
+                if(event.error !== 'aborted'){
+                    feedbackText.innerHTML = `<span class="text-slate-500">聞き取れませんでした</span>`;
+                }
+            };
+
+            recognition.onend = () => {
+                isRecognizing = false;
+                speechBtn.classList.remove('listening');
+                speechBtn.innerHTML = '<span class="text-xl">🎤</span> もう一度チェック';
+            };
+        } else {
+            alert("お使いのブラウザは音声認識に対応していません。Chromeをご利用ください。");
+        }
+
+        function autoStartSpeechRecognition() {
+            if (!recognition) return;
+            try {
+                if (isRecognizing) {
+                    recognition.abort(); 
+                }
+                setTimeout(() => {
+                    try { recognition.start(); } catch(e){}
+                }, 100);
+            } catch (e) {
+                console.error("音声認識の開始に失敗しました", e);
+            }
+        }
+
+        async function initRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    // ==========================================
+                    // 👇 変更点: typeを audio/mp4 にしました
+                    // ==========================================
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    downloadBtn.onclick = () => {
+                        const link = document.createElement('a');
+                        link.href = audioUrl;
+                        // 👇 変更点: 拡張子を .mp4 にしました
+                        link.download = `vocabulary_session_${new Date().getTime()}.mp4`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    };
+                    downloadBtn.classList.remove('hidden');
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordingStatus.classList.remove('hidden');
+                startRecContainer.classList.add('hidden');
+                
+                pronunciationArea.classList.remove('hidden');
+                pronunciationArea.classList.add('flex');
+
+                autoStartSpeechRecognition();
+
+            } catch (err) {
+                console.error("マイクのアクセスに失敗しました:", err);
+                alert("マイクの使用が許可されていないか、対応していません。");
+            }
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function updateCard() {
+            const item = currentList[currentIndex];
+            cardDisplay.innerHTML = '';
+            
+            isCurrentCardCorrect = false; 
+            feedbackText.innerHTML = '';
+            speechBtn.innerHTML = '<span class="text-xl">🎤</span> 発音をチェック';
+            
+            if (currentRound === 1 && currentIndex === 0 && !isRecording) {
+                startRecContainer.classList.remove('hidden');
+                pronunciationArea.classList.add('hidden');
+            } else {
+                startRecContainer.classList.add('hidden');
+            }
+
+            if (currentRound === 1) {
+                roundTitle.innerText = "1回目の練習";
+                roundDesc.innerText = "順番通り（すべて表示）";
+                cardDisplay.innerHTML = `
+                    <div class="text-lg font-medium text-indigo-500 mb-1">${item.h}</div>
+                    <div class="text-4xl font-bold text-slate-800 mb-2">${item.k}</div>
+                    <div class="text-base text-slate-400 font-mono italic mb-8">${item.r}</div>
+                    <div class="text-2xl text-emerald-600 font-bold">${item.zh}</div>
+                `;
+            } else if (currentRound === 2) {
+                roundTitle.innerText = "2回目の練習";
+                roundDesc.innerText = "シャッフル（ひらがな・台湾華語）";
+                cardDisplay.innerHTML = `
+                    <div class="text-4xl font-bold text-slate-800 mb-12">${item.h}</div>
+                    <div class="text-3xl text-emerald-600 font-bold">${item.zh}</div>
+                `;
+            } else if (currentRound === 3) {
+                roundTitle.innerText = "3回目の練習";
+                roundDesc.innerText = "シャッフル（台湾華語のみ）";
+                cardDisplay.innerHTML = `
+                    <div class="text-5xl font-bold text-emerald-600 py-6">${item.zh}</div>
+                `;
+            }
+
+            const totalSteps = currentList.length;
+            const progressVal = (currentIndex / totalSteps) * 100;
+            progress.style.width = `${progressVal}%`;
+
+            if (currentIndex === currentList.length - 1) {
+                nextBtn.innerText = currentRound === 3 ? "完了" : "次のラウンドへ";
+            } else {
+                nextBtn.innerText = "次へ";
+            }
+
+            if (isRecording) {
+                autoStartSpeechRecognition();
+            }
+        }
+
+        function goToNextCard() {
+            if (autoAdvanceTimeout) {
+                clearTimeout(autoAdvanceTimeout);
+                autoAdvanceTimeout = null;
+            }
+
+            if (currentIndex < currentList.length - 1) {
+                currentIndex++;
+                updateCard();
+            } else {
+                if (currentRound < 3) {
+                    currentRound++;
+                    currentIndex = 0;
+                    currentList = shuffle([...wordData]);
+                    updateCard();
+                } else {
+                    progress.style.width = `100%`;
+                    finishScreen.classList.remove('hidden');
+                    
+                    const totalQuestions = wordData.length * 3; 
+                    document.getElementById('score-display').innerText = `正解数: ${totalCorrect} / ${totalQuestions}`;
+                    
+                    if (isRecording && mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                        recordingStatus.classList.add('hidden');
+                        
+                        if (isRecognizing && recognition) {
+                            recognition.abort();
+                        }
+                    }
+                }
+            }
+        }
+
+        speechBtn.addEventListener('click', () => {
+            if (recognition) {
+                autoStartSpeechRecognition(); 
+            }
+        });
+
+        nextBtn.addEventListener('click', goToNextCard);
+
+        startRecBtn.addEventListener('click', () => {
+            initRecording();
+        });
+
+        window.onload = () => {
+            updateCard();
+        };
+    </script>
+</body>
+</html>
