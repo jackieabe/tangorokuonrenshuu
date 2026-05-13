@@ -69,7 +69,7 @@
 
     </div>
 
-    <!-- JavaScriptはHTMLが読み込まれた後（最後）に配置 -->
+    <!-- JavaScript -->
     <script>
         const wordData = [
             { h: "えいご", k: "英語", r: "Eigo", zh: "英文", accepted: ["英語", "えいご", "エイゴ", "えーご", "A語"] },
@@ -128,7 +128,7 @@
 
             recognition.onstart = () => {
                 isRecognizing = true;
-                speechBtn.classList.add('bg-indigo-300'); // 視覚的フィードバック追加
+                speechBtn.classList.add('bg-indigo-300');
                 speechBtn.innerHTML = '<span class="text-xl animate-pulse">👂</span> 聞き取り中...';
                 feedbackText.innerText = '';
             };
@@ -187,19 +187,37 @@
             }
         }
 
+        // ==========================================
+        // ↓↓↓ ここが新しく組み込んだ修正ロジックです ↓↓↓
+        // ==========================================
         async function initRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
-                    if (MediaRecorder.isTypeSupported('audio/webm')) {
+                // デフォルト設定
+                mimeType = 'audio/webm';
+                fileExtension = 'webm';
+
+                if (window.MediaRecorder && typeof MediaRecorder.isTypeSupported === 'function') {
+                    // 1. Safariかどうかを判定 (UserAgentを使用)
+                    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+                    if (isSafari && MediaRecorder.isTypeSupported('audio/mp4')) {
+                        // SafariならMP4を最優先
+                        mimeType = 'audio/mp4';
+                        fileExtension = 'mp4';
+                    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                        // Chrome/EdgeならWebMを優先
                         mimeType = 'audio/webm';
                         fileExtension = 'webm';
                     } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                        // いずれもダメでMP4がいけるならMP4
                         mimeType = 'audio/mp4';
                         fileExtension = 'mp4';
                     }
                 }
+
+                console.log(`使用する形式: ${mimeType} (.${fileExtension})`);
 
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
                 
@@ -237,6 +255,9 @@
                 alert("マイクの使用が許可されていないか、対応していません。");
             }
         }
+        // ==========================================
+        // ↑↑↑ 修正箇所ここまで ↑↑↑
+        // ==========================================
 
         function shuffle(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -287,7 +308,7 @@
             }
 
             const totalSteps = currentList.length;
-            const progressVal = ((currentIndex + 1) / totalSteps) * 100; // +1して正確な進捗に修正
+            const progressVal = ((currentIndex + 1) / totalSteps) * 100;
             progress.style.width = `${progressVal}%`;
 
             if (currentIndex === currentList.length - 1) {
