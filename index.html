@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日本語単語練習ツール（AI解析完全対応版）</title>
+    <title>日本語単語練習ツール（AI解析・音声保存完全版）</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/fix-webm-duration@1.0.5/fix-webm-duration.min.js"></script>
 </head>
@@ -70,7 +70,6 @@
             { h: "にほんご", k: "日本語", r: "Nihongo", zh: "日文", accepted: ["日本語", "にほんご", "ニホンゴ", "日本"] },
             { h: "しゃかい", k: "社会", r: "Shakai", zh: "社會", accepted: ["社会", "しゃかい", "シャカイ", "司会"] },
             { h: "りか", k: "理科", r: "Rika", zh: "理化", accepted: ["理科", "りか", "リカ", "利己", "りこ", "リコ", "理化", "以下"] },
-            // 「何」の認識に「なん」「ナン」を追加して精度向上
             { h: "なに", k: "何", r: "Nani", zh: "什麼", accepted: ["何", "なに", "ナニ", "蟹", "かに", "なん", "ナン"] },
             { h: "せんせい", k: "先生", r: "Sensei", zh: "老師", accepted: ["先生", "せんせい", "センセイ", "先制"] },
             { h: "にほん", k: "日本", r: "Nihon", zh: "日本", accepted: ["日本", "にほん", "ニホン", "二本"] },
@@ -114,7 +113,7 @@
                         isCurrentCardCorrect = true; 
                     }
                     
-                    // ダブルスキップ防止（前のタイマーがあれば消して新しくセット）
+                    // ダブルスキップ防止処理
                     if (autoAdvanceTimeout) clearTimeout(autoAdvanceTimeout);
                     autoAdvanceTimeout = setTimeout(goToNextCard, 1200);
                 } else {
@@ -129,11 +128,10 @@
 
         async function initRecording() {
             try {
-                audioChunks = []; // ★追加: 録音のたびにデータを確実にリセット
+                audioChunks = []; // 毎回必ずリセット
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
                 
-                // ★追加: AI解析向けのより厳密なMIMEタイプ指定
                 if (isSafari && MediaRecorder.isTypeSupported('audio/mp4')) { 
                     mimeType = 'audio/mp4'; 
                     fileExtension = 'mp4'; 
@@ -145,18 +143,16 @@
                 mediaRecorder = new MediaRecorder(stream, { mimeType });
                 
                 mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) audioChunks.push(e.data); // データが空でないかチェックして追加
+                    if (e.data.size > 0) audioChunks.push(e.data);
                 };
                 
                 mediaRecorder.onstop = () => {
                     const duration = Date.now() - startTime;
                     const blob = new Blob(audioChunks, { type: mimeType });
                     
-                    // WebMの場合のみメタデータを修正し、安全なBlobに包み直す
                     if (fileExtension === 'webm') {
                         ysFixWebmDuration(blob, duration, { logger: false }, (fixedBlob) => {
-                            // ★追加: Geminiが読み込めるよう標準的なBlobへ再構築
-                            const finalBlob = new Blob([fixedBlob], { type: 'audio/webm' });
+                            const finalBlob = new Blob([fixedBlob], { type: mimeType });
                             setupDownload(finalBlob);
                         });
                     } else {
@@ -165,7 +161,8 @@
                 };
 
                 startTime = Date.now();
-                mediaRecorder.start(1000); // ★追加: 1秒ごとにデータを蓄積させ、ファイルの破損を防ぐ
+                // 修正箇所：引数なしでスタートさせる（これで保存処理が止まらなくなります）
+                mediaRecorder.start(); 
                 isRecording = true;
                 
                 recordingStatus.classList.remove('hidden');
@@ -186,7 +183,7 @@
                 a.download = `session_${new Date().getTime()}.${fileExtension}`;
                 a.click();
             };
-            downloadBtn.classList.remove('hidden');
+            downloadBtn.classList.remove('hidden'); // ボタンを表示
         }
 
         function updateCard() {
@@ -212,7 +209,6 @@
         }
 
         function goToNextCard() {
-            // 手動で「次へ」を押した際に、自動進行のタイマーをキャンセルする
             if (autoAdvanceTimeout) {
                 clearTimeout(autoAdvanceTimeout);
                 autoAdvanceTimeout = null;
