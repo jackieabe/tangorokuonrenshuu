@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日本語単語練習ツール（AI解析完全対応版）</title>
+    <title>日本語単語練習ツール（ログ強化版）</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- WebMの再生時間を修正するライブラリ -->
     <script src="https://cdn.jsdelivr.net/npm/fix-webm-duration@1.0.5/fix-webm-duration.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex items-center justify-center p-4">
 
     <div class="max-w-md w-full bg-white rounded-xl shadow-lg overflow-hidden relative">
         
-        <!-- ヘッダーエリア -->
         <div class="bg-indigo-50 p-6 border-b border-indigo-100">
             <h1 id="round-title" class="text-xl font-bold text-indigo-800">1回目の練習</h1>
             <p id="round-desc" class="text-sm text-indigo-600 mt-1">順番通り（すべて表示）</p>
@@ -25,13 +23,11 @@
             </div>
         </div>
 
-        <!-- メインカードエリア -->
         <div class="p-8 text-center min-h-[300px] flex flex-col justify-center items-center">
             <div id="card-display" class="w-full"></div>
             <div id="feedback-text" class="mt-6 text-lg font-bold min-h-[1.5rem]"></div>
         </div>
 
-        <!-- 操作ボタンエリア -->
         <div class="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-4">
             <div id="start-record-container" class="flex justify-center">
                 <button id="start-rec-btn" class="w-full py-4 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-lg shadow-lg transition-all active:scale-95">
@@ -49,21 +45,23 @@
             </div>
         </div>
 
-        <!-- 終了画面 -->
-        <div id="finish-screen" class="hidden absolute inset-0 bg-white flex flex-col items-center justify-center p-6 text-center z-20">
+        <div id="finish-screen" class="hidden absolute inset-0 bg-white flex flex-col items-center justify-center p-6 text-center z-20 overflow-y-auto">
             <div class="text-6xl mb-4">🎉</div>
             <h2 class="text-2xl font-bold text-slate-800 mb-2">お疲れ様でした！</h2>
             <p id="score-display" class="text-lg text-slate-600 mb-6">正解数: 0 / 0</p>
             
             <div class="flex flex-col gap-3 w-full">
-                <button id="download-btn" class="hidden w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg shadow">
+                <button id="download-audio-btn" class="hidden w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg shadow">
                     💾 AI解析用音声を保存
                 </button>
+                <button id="download-log-btn" class="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg shadow">
+                    📄 練習ログ(.txt)を保存
+                </button>
                 <button id="copy-log-btn" class="w-full py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg">
-                    📋 練習ログをコピー (Gemini用)
+                    📋 プロンプトをコピー (Gemini用)
                 </button>
             </div>
-            <p class="text-xs text-slate-400 mt-4">音声をGeminiにアップロードして評価を依頼してください。</p>
+            <p class="text-xs text-slate-400 mt-4">音声とログをGeminiに渡して評価を依頼してください。</p>
         </div>
     </div>
 
@@ -84,14 +82,19 @@
         ];
 
         let currentRound = 1, currentIndex = 0, currentList = [...wordData], totalCorrect = 0;
-        let isCurrentCardCorrect = false, autoAdvanceTimeout = null, sessionTranscript = [];
+        let isCurrentCardCorrect = false, autoAdvanceTimeout = null;
+        
+        // --- ログ構造の変更 ---
+        let sessionLogs = []; 
+
         let mediaRecorder, audioChunks = [], isRecording = false, startTime, mimeType = 'audio/webm', fileExtension = 'webm';
 
         const roundTitle = document.getElementById('round-title'), roundDesc = document.getElementById('round-desc');
         const cardDisplay = document.getElementById('card-display'), nextBtn = document.getElementById('next-btn');
         const progress = document.getElementById('progress'), finishScreen = document.getElementById('finish-screen');
         const recordingStatus = document.getElementById('recording-status'), startRecBtn = document.getElementById('start-rec-btn');
-        const downloadBtn = document.getElementById('download-btn'), speechBtn = document.getElementById('speech-btn');
+        const downloadAudioBtn = document.getElementById('download-audio-btn'), speechBtn = document.getElementById('speech-btn');
+        const downloadLogBtn = document.getElementById('download-log-btn');
         const feedbackText = document.getElementById('feedback-text'), copyLogBtn = document.getElementById('copy-log-btn');
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -109,7 +112,10 @@
                 const currentWord = currentList[currentIndex];
                 const isCorrect = currentWord.accepted.some(word => transcript.includes(word));
                 
-                sessionTranscript.push(`Round${currentRound} [${currentWord.k}] -> 認識: ${transcript} (${isCorrect ? '○' : '×'})`);
+                // 現在表示中のカードのログを更新
+                const currentLogEntry = sessionLogs[sessionLogs.length - 1];
+                currentLogEntry.status = isCorrect ? '○【正解】' : '×【不正解】';
+                currentLogEntry.transcript = transcript;
 
                 if (isCorrect) {
                     feedbackText.innerHTML = `<span class="text-emerald-600">⭕️ 正解！ (${transcript})</span>`;
@@ -152,10 +158,10 @@
                     
                     if (fileExtension === 'webm') {
                         ysFixWebmDuration(blob, duration, { logger: false }, (fixedBlob) => {
-                            setupDownload(new Blob([fixedBlob], { type: 'audio/webm' }));
+                            setupAudioDownload(new Blob([fixedBlob], { type: 'audio/webm' }));
                         });
                     } else {
-                        setupDownload(blob);
+                        setupAudioDownload(blob);
                     }
                 };
 
@@ -173,15 +179,15 @@
             }
         }
 
-        function setupDownload(blob) {
+        function setupAudioDownload(blob) {
             const url = URL.createObjectURL(blob);
-            downloadBtn.onclick = () => {
+            downloadAudioBtn.onclick = () => {
                 const a = document.createElement('a');
                 a.href = url; 
-                a.download = `practice_session_${new Date().getTime()}.${fileExtension}`;
+                a.download = `practice_audio_${new Date().getTime()}.${fileExtension}`;
                 a.click();
             };
-            downloadBtn.classList.remove('hidden');
+            downloadAudioBtn.classList.remove('hidden');
         }
 
         function updateCard() {
@@ -196,7 +202,7 @@
             ];
             
             roundTitle.innerText = roundInfo[currentRound - 1].title;
-            roundDesc.innerText = roundInfo[currentRound - 1].desc;
+            roundDesc.innerText = roundDesc.innerText = roundInfo[currentRound - 1].desc;
 
             const htmls = [
                 `<div><div class="text-indigo-500 text-lg">${item.h}</div><div class="text-5xl font-bold my-2">${item.k}</div><div class="italic text-slate-400">${item.r}</div><div class="text-2xl text-emerald-600 font-bold mt-6">${item.zh}</div></div>`,
@@ -208,6 +214,14 @@
             progress.style.width = `${((currentIndex + 1) / currentList.length) * 100}%`;
             nextBtn.innerText = (currentIndex === currentList.length - 1) ? (currentRound === 3 ? "完了" : "次ラウンドへ") : "次へ";
             
+            // --- カード表示時にログの雛形を作成 (未発話対応) ---
+            sessionLogs.push({
+                round: currentRound,
+                word: item.k,
+                status: '―【未発話】',
+                transcript: '（発音なし）'
+            });
+
             startSpeechRecognition();
         }
 
@@ -243,16 +257,39 @@
             }
         }
 
+        // --- ログ文字列の生成 ---
+        function generateLogText() {
+            let logBody = "=== 日本語練習セッション ログ ===\n";
+            logBody += `実施日: ${new Date().toLocaleString()}\n`;
+            logBody += `合計正解数: ${totalCorrect} / ${wordData.length * 3}\n\n`;
+            
+            sessionLogs.forEach(log => {
+                logBody += `Round${log.round} [${log.word.padEnd(6, ' ')}] 結果: ${log.status.padEnd(8, ' ')} 認識された音: ${log.transcript}\n`;
+            });
+            return logBody;
+        }
+
+        // --- ダウンロード・コピーイベント ---
         startRecBtn.addEventListener('click', initRecording);
         nextBtn.addEventListener('click', goToNextCard);
         speechBtn.addEventListener('click', startSpeechRecognition);
+
+        downloadLogBtn.addEventListener('click', () => {
+            const text = generateLogText();
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `practice_log_${new Date().getTime()}.txt`;
+            a.click();
+        });
         
         copyLogBtn.addEventListener('click', () => {
-            const promptHeader = "以下の日本語練習ログと録音ファイルを解析してください。発音の正確性、認識された単語の癖、改善のためのアドバイスを日本語でお願いします。\n\n--- 練習ログ ---\n";
-            const fullLog = promptHeader + sessionTranscript.join('\n');
+            const promptHeader = "以下の日本語練習ログと録音ファイルを解析してください。発音の正確性、認識された単語の癖、改善のためのアドバイスを日本語で詳しくお願いします。\n\n--- 練習ログ ---\n";
+            const fullLog = promptHeader + generateLogText();
             navigator.clipboard.writeText(fullLog);
-            copyLogBtn.innerText = "✅ プロンプトごとコピー完了！";
-            setTimeout(() => copyLogBtn.innerText = "📋 練習ログをコピー (Gemini用)", 2000);
+            copyLogBtn.innerText = "✅ コピー完了！";
+            setTimeout(() => copyLogBtn.innerText = "📋 プロンプトをコピー (Gemini用)", 2000);
         });
 
         window.onload = () => {
